@@ -1,0 +1,34 @@
+{
+    "version": 4,
+    "configurePresets": [
+        {
+            "name": "base",
+            "binaryDir": "./build",
+            "hidden": true
+        },
+        {
+            "name": "mingw",
+            "displayName": "MinGW-w64 makefiles",
+            "inherits": ["base"],
+            "generator": "MinGW Makefiles"
+        },
+        {
+            "name": "unix",
+            "displayName": "Unix Makefiles",
+            "inherits": ["base"],
+            "generator": "Unix Makefiles"
+        },
+        {
+            "name": "ninja",
+            "displayName": "Ninja",
+            "inherits": ["base"],
+            "generator": "Ninja"
+        },
+        {
+            "name": "msvc26",
+            "displayName": "Visual studio 18 2026",
+            "inherits": ["base"],
+            "generator": "Visual Studio 18 2026"
+        }
+    ]
+}
