@@ -78,7 +78,7 @@ void computeNormals(const std::vector<glm::vec3> &vertices,
     // Compute per-vertex normals by averaging the unnormalized face normals
     std::uint32_t vertexIndex0, vertexIndex1, vertexIndex2;
     glm::vec3 normal;
-    int numIndices = indices.size();
+    int numIndices = static_cast<int>(indices.size());
     for (int i = 0; i < numIndices; i += 3) {
         vertexIndex0 = indices[i];
         vertexIndex1 = indices[i + 1];
@@ -90,7 +90,7 @@ void computeNormals(const std::vector<glm::vec3> &vertices,
         (*normals)[vertexIndex2] += normal;
     }
 
-    int numNormals = normals->size();
+    int numNormals = static_cast<int>(normals->size());
     for (int i = 0; i < numNormals; i++) {
         (*normals)[i] = glm::normalize((*normals)[i]);
     }
@@ -100,7 +100,7 @@ void computeNormals(const std::vector<glm::vec3> &vertices,
 // Start trackball tracking
 static void trackballStartTracking(Trackball &trackball, glm::vec2 point)
 {
-    trackball.vStart = mapMousePointToUnitSphere(point, trackball.radius, trackball.center);
+    trackball.vStart = mapMousePointToUnitSphere(point, static_cast<float>(trackball.radius), trackball.center);
     trackball.qStart = glm::quat(trackball.qCurrent);
     trackball.tracking = true;
 }
@@ -114,7 +114,7 @@ static void trackballStopTracking(Trackball &trackball)
 // Rotate trackball from, e.g., mouse movement
 static void trackballMove(Trackball &trackball, glm::vec2 point)
 {
-    glm::vec3 vCurrent = mapMousePointToUnitSphere(point, trackball.radius, trackball.center);
+    glm::vec3 vCurrent = mapMousePointToUnitSphere(point, static_cast<float>(trackball.radius), trackball.center);
     glm::vec3 rotationAxis = glm::cross(trackball.vStart, vCurrent);
     float dotProduct = std::max(std::min(glm::dot(trackball.vStart, vCurrent), 1.0f), -1.0f);
     float rotationAngle = std::acos(dotProduct);
@@ -185,7 +185,7 @@ static bool objMeshLoad(OBJMesh &mesh, const std::string &filename)
 
     // Display log message
     std::cout << "Loaded OBJ file " << filename << std::endl;
-    int numTriangles = mesh.indices.size() / 3;
+    auto numTriangles = mesh.indices.size() / 3;
     std::cout << "Number of triangles: " << numTriangles << std::endl;
 
     return true;
@@ -335,7 +335,7 @@ static bool objMeshUVLoad(OBJMeshUV &mesh, const std::string &filename)
 
     // Display log message
     std::cout << "Loaded OBJ file " << filename << std::endl;
-    int numTriangles = mesh.indices.size() / 3;
+    auto numTriangles = mesh.indices.size() / 3;
     std::cout << "Number of triangles: " << numTriangles << std::endl;
 
     return true;

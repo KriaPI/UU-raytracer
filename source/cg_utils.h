@@ -8,15 +8,20 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <format>
+#include <exception>
 
 namespace cg {
 
 std::string readShaderSource(const std::string &filename)
 {
     std::ifstream file(filename);
+    if (file.is_open() == false) {
+        std::cerr << std::format("The file {} could not be opened.", filename) << "\n";
+    }
+
     std::stringstream stream;
     stream << file.rdbuf();
-
     return stream.str();
 }
 
@@ -48,7 +53,7 @@ GLuint loadShaderProgram(const std::string &vertexShaderFilename,
     std::string vertexShaderSource = readShaderSource(vertexShaderFilename);
     const char *vertexShaderSourcePtr = vertexShaderSource.c_str();
     glShaderSource(vertexShader, 1, &vertexShaderSourcePtr, nullptr);
-
+    
     glCompileShader(vertexShader);
     GLint compiled = 0;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &compiled);

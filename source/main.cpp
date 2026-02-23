@@ -44,7 +44,8 @@ struct Context {
 std::string shaderDir() noexcept
 {
     const std::string rootDirectory{PROJECT_PATH};
-    return rootDirectory + "/src/shaders/";
+    std::cout << rootDirectory + "/source/shaders/" << "\n";
+    return rootDirectory + "/source/shaders/";
 }
 
 // Returns the absolute path to the 3D model directory
@@ -93,7 +94,7 @@ void updateRayTracing(Context &ctx)
     if (ctx.rtx.current_frame >= ctx.rtx.max_frames) { return; }
 
     // Render as much as we can within the current frame
-    float tic = glfwGetTime();
+    auto tic = glfwGetTime();
     while (true) {
         rt::updateImage(ctx.rtx);
         if (glfwGetTime() - tic > (1.0f / 60.0f)) { break; }
@@ -171,7 +172,7 @@ void mouseButtonPressed(Context *ctx, int button, int x, int y)
     }
 }
 
-void mouseButtonReleased(Context *ctx, int button, int x, int y)
+void mouseButtonReleased(Context *ctx, int button, [[maybe_unused]] int x, [[maybe_unused]] int y)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT) { cg::trackballStopTracking(ctx->trackball); }
 }
@@ -214,9 +215,9 @@ void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
 
     Context *ctx = static_cast<Context *>(glfwGetWindowUserPointer(window));
     if (action == GLFW_PRESS) {
-        mouseButtonPressed(ctx, button, x, y);
+        mouseButtonPressed(ctx, button, static_cast<int>(x), static_cast<int>(y));
     } else {
-        mouseButtonReleased(ctx, button, x, y);
+        mouseButtonReleased(ctx, button, static_cast<int>(x), static_cast<int>(y));
     }
 }
 
@@ -225,7 +226,7 @@ void cursorPosCallback(GLFWwindow *window, double x, double y)
     if (ImGui::GetIO().WantCaptureMouse) { return; }  // Skip other handling
 
     Context *ctx = static_cast<Context *>(glfwGetWindowUserPointer(window));
-    moveTrackball(ctx, x, y);
+    moveTrackball(ctx, static_cast<int>(x), static_cast<int>(y));
 }
 
 void resizeCallback(GLFWwindow *window, int width, int height)
@@ -286,7 +287,7 @@ int main(void)
     // Start rendering loop
     while (!glfwWindowShouldClose(ctx.window)) {
         glfwPollEvents();
-        ctx.elapsed_time = glfwGetTime();
+        ctx.elapsed_time = static_cast<float>(glfwGetTime());
         ImGui_ImplGlfwGL3_NewFrame();
         display(ctx);
         ImGui::Render();
