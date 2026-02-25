@@ -19,20 +19,49 @@ struct Scene {
     Box mesh_bbox;
 } g_scene;
 
-inline double random_double() {
-    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+inline double random_float() {
+    static std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
     static std::mt19937 generator;
     return distribution(generator);
 }
 
-inline double random_double(double min, double max) {
+inline double random_float(float min, float max) {
     // Returns a random real in [min,max).
-    return min + (max-min)*random_double();
+    return min + (max-min)*random_float();
 }
 
 glm::vec3 sample_square() {
     // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
-    return glm::vec3(random_double() - 0.5, random_double() - 0.5, 0);
+    return glm::vec3(random_float() - 0.5f, random_float() - 0.5f, 0.0f);
+}
+
+glm::vec3 random_vector() {
+    return glm::vec3(random_float(), random_float(), random_float());
+}
+
+glm::vec3 random_vector(float min, float max) {
+    return glm::vec3(random_float(min, max), random_float(min, max), random_float(min, max));
+}
+
+float length_squared(const glm::vec3& vector) {
+    return glm::dot(vector, vector);
+}
+
+inline glm::vec3 random_unit_vector() {
+    while (true) {
+        auto p = random_vector(-1.0f, 1.0f);
+        auto lensq = length_squared(p);
+        if (1e-37 < lensq && lensq <= 1.0f)
+            return p / sqrt(lensq);
+    }
+}
+
+inline glm::vec3 random_on_hemisphere(const glm::vec3& normal) {
+    glm::vec3 on_unit_sphere = random_unit_vector();
+    if (glm::dot(on_unit_sphere, normal) > 0.0) // In the same hemisphere as the normal
+        return on_unit_sphere;
+    else
+        return -on_unit_sphere;
 }
 
 bool hit_world(const Ray &r, float t_min, float t_max, HitRecord &rec)
@@ -84,13 +113,15 @@ glm::vec3 color(RTContext &rtx, const Ray &r, int max_bounces)
     if (max_bounces < 0) return glm::vec3(0.0f);
 
     HitRecord rec;
-    if (hit_world(r, 0.0f, 9999.0f, rec)) {
+    /// Note: we set it to 0.002f instead of 0 due to limitations of floating point precision. 
+    if (hit_world(r, 0.002f, 9999.0f, rec)) {
         rec.normal = glm::normalize(rec.normal);  // Always normalise before use!
         if (rtx.show_normals) { return rec.normal * 0.5f + 0.5f; }
 
         // Implement lighting for materials here
         // ...
-        return glm::vec3(0.0f);
+        glm::vec3 direction = rec.normal + random_on_hemisphere(rec.normal);
+        return 0.7f * color(rtx, Ray(rec.p, direction), max_bounces - 1);
     }
 
     // If no hit, return sky color
@@ -170,7 +201,7 @@ void updateImage(RTContext &rtx)
 {
     if (rtx.freeze) return;                    // Skip update
     rtx.image.resize(rtx.width * rtx.height);  // Just in case...
-
+    
     updateLine(rtx, rtx.current_line % rtx.height);
 
     if (rtx.current_frame < rtx.max_frames) {
