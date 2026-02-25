@@ -9,8 +9,11 @@ class Ray {
   public:
     Ray() {}
     Ray(const glm::vec3 &a, const glm::vec3 &b)
-    {
+    {   
+        // Orgin
         A = a;
+
+        // Direction
         B = b;
     }
     glm::vec3 origin() const

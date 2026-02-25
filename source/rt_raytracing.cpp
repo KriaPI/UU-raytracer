@@ -6,7 +6,7 @@
 #include "rt_box.h"
 
 #include "cg_utils2.h"  // Used for OBJ-mesh loading
-#include <stdlib.h>     // Needed for drand48()
+#include <random>
 
 namespace rt {
 
@@ -18,6 +18,22 @@ struct Scene {
     std::vector<Triangle> mesh;
     Box mesh_bbox;
 } g_scene;
+
+inline double random_double() {
+    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    static std::mt19937 generator;
+    return distribution(generator);
+}
+
+inline double random_double(double min, double max) {
+    // Returns a random real in [min,max).
+    return min + (max-min)*random_double();
+}
+
+glm::vec3 sample_square() {
+    // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
+    return glm::vec3(random_double() - 0.5, random_double() - 0.5, 0);
+}
 
 bool hit_world(const Ray &r, float t_min, float t_max, HitRecord &rec)
 {
@@ -127,8 +143,9 @@ void updateLine(RTContext &rtx, int y)
     // You can try parallelising this loop by uncommenting this line:
     //#pragma omp parallel for schedule(dynamic)
     for (int x = 0; x < nx; ++x) {
-        float u = (float(x) + 0.5f) / float(nx);
-        float v = (float(y) + 0.5f) / float(ny);
+        auto offset = sample_square();
+        float u = (float(x) + 0.5f + offset.x) / float(nx);
+        float v = (float(y) + 0.5f + offset.y) / float(ny);
         Ray r(origin, lower_left_corner + u * horizontal + v * vertical);
         r.A = glm::vec3(world_from_view * glm::vec4(r.A, 1.0f));
         r.B = glm::vec3(world_from_view * glm::vec4(r.B, 0.0f));
