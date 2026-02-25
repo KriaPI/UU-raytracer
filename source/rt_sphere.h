@@ -1,22 +1,27 @@
 #pragma once
 
 #include "rt_hitable.h"
+#include <memory>
 
 namespace rt {
 
 class Sphere : public Hitable {
   public:
     Sphere() {}
+    // TODO: init material
     Sphere(const glm::vec3 &cen, float r) : center(cen), radius(r){};
     virtual bool hit(const Ray &r, float t_min, float t_max, HitRecord &rec) const;
-
+    
+  private:
     glm::vec3 center;
     float radius;
+    std::shared_ptr<Material> material; 
 };
 
 // Ray-sphere test from "Ray Tracing in a Weekend" book (page 16)
 bool Sphere::hit(const Ray &r, float t_min, float t_max, HitRecord &rec) const
 {
+    rec.material = material;
     glm::vec3 oc = r.origin() - center;
     float a = glm::dot(r.direction(), r.direction());
     float b = 2.0f * glm::dot(oc, r.direction());
