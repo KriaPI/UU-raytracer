@@ -9,7 +9,7 @@ class Sphere : public Hitable {
   public:
     Sphere() {}
     // TODO: init material
-    Sphere(const glm::vec3 &cen, float r) : center(cen), radius(r){};
+    Sphere(const glm::vec3 &cen, float r, std::shared_ptr<Material> mat) : center(cen), radius(r), material(mat) {};
     virtual bool hit(const Ray &r, float t_min, float t_max, HitRecord &rec) const;
     
   private:

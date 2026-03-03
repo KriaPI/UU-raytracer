@@ -6,7 +6,10 @@
 #include "rt_box.h"
 
 #include "cg_utils2.h"  // Used for OBJ-mesh loading
-#include <random>
+#include <memory>
+#include <algorithm>
+#include <utility>
+#include <format>
 
 namespace rt {
 
@@ -19,50 +22,6 @@ struct Scene {
     Box mesh_bbox;
 } g_scene;
 
-inline double random_float() {
-    static std::uniform_real_distribution<float> distribution(0.0f, 1.0f);
-    static std::mt19937 generator;
-    return distribution(generator);
-}
-
-inline double random_float(float min, float max) {
-    // Returns a random real in [min,max).
-    return min + (max-min)*random_float();
-}
-
-glm::vec3 sample_square() {
-    // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
-    return glm::vec3(random_float() - 0.5f, random_float() - 0.5f, 0.0f);
-}
-
-glm::vec3 random_vector() {
-    return glm::vec3(random_float(), random_float(), random_float());
-}
-
-glm::vec3 random_vector(float min, float max) {
-    return glm::vec3(random_float(min, max), random_float(min, max), random_float(min, max));
-}
-
-float length_squared(const glm::vec3& vector) {
-    return glm::dot(vector, vector);
-}
-
-inline glm::vec3 random_unit_vector() {
-    while (true) {
-        auto p = random_vector(-1.0f, 1.0f);
-        auto lensq = length_squared(p);
-        if (1e-37 < lensq && lensq <= 1.0f)
-            return p / sqrt(lensq);
-    }
-}
-
-inline glm::vec3 random_on_hemisphere(const glm::vec3& normal) {
-    glm::vec3 on_unit_sphere = random_unit_vector();
-    if (glm::dot(on_unit_sphere, normal) > 0.0) // In the same hemisphere as the normal
-        return on_unit_sphere;
-    else
-        return -on_unit_sphere;
-}
 
 bool hit_world(const Ray &r, float t_min, float t_max, HitRecord &rec)
 {
@@ -89,13 +48,17 @@ bool hit_world(const Ray &r, float t_min, float t_max, HitRecord &rec)
             rec = temp_rec;
         }
     }
-    for (int i = 0; i < g_scene.mesh.size(); ++i) {
-        if (g_scene.mesh[i].hit(r, t_min, closest_so_far, temp_rec)) {
-            hit_anything = true;
-            closest_so_far = temp_rec.t;
-            rec = temp_rec;
+
+    if (g_scene.mesh_bbox.hit(r, t_min, closest_so_far, temp_rec)) {
+        for (int i = 0; i < g_scene.mesh.size(); ++i) {
+            if (g_scene.mesh[i].hit(r, t_min, closest_so_far, temp_rec)) {
+                hit_anything = true;
+                closest_so_far = temp_rec.t;
+                rec = temp_rec;
+            }
         }
     }
+
     return hit_anything;
 }
 
@@ -120,8 +83,15 @@ glm::vec3 color(RTContext &rtx, const Ray &r, int max_bounces)
 
         // Implement lighting for materials here
         // ...
-        glm::vec3 direction = rec.normal + random_on_hemisphere(rec.normal);
-        return 0.7f * color(rtx, Ray(rec.p, direction), max_bounces - 1);
+        Ray scattered;
+        Color attenuation;
+
+        if (rec.material->scatter(r, rec, attenuation, scattered))
+                return attenuation * color(rtx, scattered, max_bounces - 1);
+
+        return Color(0.0f);
+        //glm::vec3 direction = rec.normal + random_on_hemisphere(rec.normal);
+        //return 0.7f * color(rtx, Ray(rec.p, direction), max_bounces - 1);
     }
 
     // If no hit, return sky color
@@ -130,33 +100,83 @@ glm::vec3 color(RTContext &rtx, const Ray &r, int max_bounces)
     return (1.0f - t) * rtx.ground_color + t * rtx.sky_color;
 }
 
+void updateMaxAndMin(glm::vec3& min, glm::vec3& max, const glm::vec3& vertex) {
+    min.x = vertex.x < min.x ? vertex.x : min.x;
+    min.y = vertex.y < min.y ? vertex.y : min.y;
+    min.z = vertex.z < min.z ? vertex.z : min.z;
+
+    max.x = vertex.x > max.x ? vertex.x : max.x;
+    max.y = vertex.y > max.y ? vertex.y : max.y;
+    max.z = vertex.z > max.z ? vertex.z : max.z;
+}
+
+auto calculateCenter(const glm::vec3& min, const glm::vec3& max) {
+    auto distance = max - min;
+    return min + (distance * 0.5f);
+}
+
+auto calculateRadius(const glm::vec3& min, const glm::vec3& max) {
+    auto distance = max - min;
+    return std::max({distance.x, distance.y, distance.z}) * 0.5f; 
+}
+
+auto calculateBoundingBox(const std::vector<rt::Triangle>& mesh, float boxOffset) {
+    glm::vec3 min {0.0f};
+    glm::vec3 max {0.0f};
+
+    for (const auto& triangle: mesh) {
+        updateMaxAndMin(min, max, triangle.v0);
+        updateMaxAndMin(min, max, triangle.v1);
+        updateMaxAndMin(min, max, triangle.v2);
+    }
+
+    auto center = calculateCenter(min, max);
+    auto radius = calculateRadius(min, max);
+
+    return std::pair {center, radius + boxOffset};
+}
+
 // MODIFY THIS FUNCTION!
 void setupScene(RTContext &rtx, const char *filename)
 {
-    g_scene.ground = Sphere(glm::vec3(0.0f, -1000.5f, 0.0f), 1000.0f);
+    auto material_ground = std::make_shared<Lambertian>(Color(0.8, 0.8, 0.0));
+    auto material_center = std::make_shared<Lambertian>(Color(0.1, 0.2, 0.5));
+    auto material_left   = std::make_shared<Metal>(Color(0.8, 0.8, 0.8), 0.3);
+    auto material_right  = std::make_shared<Metal>(Color(0.8, 0.6, 0.2), 1.0);
+    
+    g_scene.ground = Sphere(glm::vec3(0.0f, -1000.5f, 0.0f), 1000.0f, material_ground);
     g_scene.spheres = {
-        Sphere(glm::vec3(0.0f, 0.0f, 0.0f), 0.5f),
-        Sphere(glm::vec3(1.0f, 0.0f, 0.0f), 0.5f),
-        Sphere(glm::vec3(-1.0f, 0.0f, 0.0f), 0.5f),
+        Sphere(glm::vec3(0.0f, 0.0f, -2.0f), 0.5f, material_center),
+        Sphere(glm::vec3(2.0f, 0.0f, 0.0f), 0.5f, material_left),
+        Sphere(glm::vec3(-2.0f, 0.0f, 0.0f), 0.5f, material_right),
     };
-    //g_scene.boxes = {
-    //    Box(glm::vec3(0.0f, -0.25f, 0.0f), glm::vec3(0.25f)),
-    //    Box(glm::vec3(1.0f, -0.25f, 0.0f), glm::vec3(0.25f)),
-    //    Box(glm::vec3(-1.0f, -0.25f, 0.0f), glm::vec3(0.25f)),
-    //};
+    g_scene.boxes = {
+        Box(glm::vec3(0.0f, -0.25f, -1.0f), glm::vec3(0.25f), material_left),
+        Box(glm::vec3(1.0f, -0.25f, -1.0f), glm::vec3(0.25f), material_left),
+        Box(glm::vec3(-1.0f, -0.25f, -1.0f), glm::vec3(0.25f), material_left),
+    };
 
-    //cg::OBJMesh mesh;
-    //cg::objMeshLoad(mesh, filename);
-    //g_scene.mesh.clear();
-    //for (int i = 0; i < mesh.indices.size(); i += 3) {
-    //    int i0 = mesh.indices[i + 0];
-    //    int i1 = mesh.indices[i + 1];
-    //    int i2 = mesh.indices[i + 2];
-    //    glm::vec3 v0 = mesh.vertices[i0] + glm::vec3(0.0f, 0.135f, 0.0f);
-    //    glm::vec3 v1 = mesh.vertices[i1] + glm::vec3(0.0f, 0.135f, 0.0f);
-    //    glm::vec3 v2 = mesh.vertices[i2] + glm::vec3(0.0f, 0.135f, 0.0f);
-    //    g_scene.mesh.push_back(Triangle(v0, v1, v2));
-    //}
+    cg::OBJMesh mesh;
+    cg::objMeshLoad(mesh, filename);
+    g_scene.mesh.clear();
+    for (int i = 0; i < mesh.indices.size(); i += 3) {
+        int i0 = mesh.indices[i + 0];
+        int i1 = mesh.indices[i + 1];
+        int i2 = mesh.indices[i + 2];
+        glm::vec3 v0 = mesh.vertices[i0] + glm::vec3(0.0f, 0.135f, 0.0f);
+        glm::vec3 v1 = mesh.vertices[i1] + glm::vec3(0.0f, 0.135f, 0.0f);
+        glm::vec3 v2 = mesh.vertices[i2] + glm::vec3(0.0f, 0.135f, 0.0f);
+        g_scene.mesh.push_back(Triangle(v0, v1, v2));
+    }
+    
+    auto boundingBox = calculateBoundingBox(g_scene.mesh, -0.01f);
+    auto center = boundingBox.first;
+    auto radius = boundingBox.second;
+
+    g_scene.mesh_bbox = Box(center, glm::vec3(radius), material_left);
+
+    //std::cout << "Bounding box: " << std::format("center = ({}, {}, {})", center.x, center.y, center.z) << ", radius = " << boundingBox.second << "\n"; 
+
 }
 
 // MODIFY THIS FUNCTION!

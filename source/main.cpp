@@ -38,6 +38,7 @@ struct Context {
     rt::RTContext rtx;
     GLuint texture = 0;
     float elapsed_time;
+    bool useGammaCorrection = true;
 };
 
 // Returns the absolute path to the shader directory
@@ -112,6 +113,7 @@ void drawImage(Context &ctx)
     // Activate program and pass uniform for texture unit
     glUseProgram(ctx.program);
     glUniform1i(glGetUniformLocation(ctx.program, "u_texture"), 0);
+    glUniform1i(glGetUniformLocation(ctx.program, "u_useGammaCorrection"), ctx.useGammaCorrection);
 
     // Draw fullscreen quad (without any vertex buffers)
     glBindVertexArray(ctx.emptyVAO);
@@ -131,6 +133,8 @@ void showGui(Context &ctx)
     if (ImGui::Checkbox("Show normals", &ctx.rtx.show_normals)) { rt::resetAccumulation(ctx.rtx); }
     // Add more settings and parameters here
     // ...
+
+    ImGui::Checkbox("Gamma correction", &ctx.useGammaCorrection);
 
     ImGui::Text("Progress");
     ImGui::ProgressBar(float(ctx.rtx.current_frame) / ctx.rtx.max_frames);

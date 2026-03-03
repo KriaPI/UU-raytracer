@@ -7,17 +7,19 @@ namespace rt {
 class Box : public Hitable {
   public:
     Box() {}
-    Box(const glm::vec3 &cen, const glm::vec3 r) : center(cen), radius(r){};
+    Box(const glm::vec3 &cen, const glm::vec3 r, std::shared_ptr<Material> mat) : center(cen), radius(r), material(mat) {};
     virtual bool hit(const Ray &r, float t_min, float t_max, HitRecord &rec) const;
 
     glm::vec3 center;
     glm::vec3 radius;
+    std::shared_ptr<Material> material; 
 };
 
 // Ray-box test adapted from branchless code at
 // https://tavianator.com/fast-branchless-raybounding-box-intersections/
 bool Box::hit(const Ray &r, float t_min, float t_max, HitRecord &rec) const
 {
+    rec.material = material;
     glm::vec3 oc = r.origin() - center;
     glm::vec3 t0 = (-radius - oc) / r.direction();
     glm::vec3 t1 = (radius - oc) / r.direction();
